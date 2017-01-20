@@ -3,7 +3,7 @@ stages:
   - deploy
 
 variables:
-  IMAGE: lukehowell/http-redirects
+  IMAGE: lukehowell/redirect
 
 build/ssl-app:
   stage: build
