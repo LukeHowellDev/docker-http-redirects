@@ -1,0 +1,103 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  IMAGE: lukehowell/http-redirects
+
+build/ssl-app:
+  stage: build
+  image: golang
+  variables:
+    GOOS: "linux"
+    GOARCH: "amd64"
+    CGO_ENABLED: "0"
+  script:
+    - cd ssl-redirect
+    - go build -a -installsuffix cgo -o ssl-redirect .
+  artifacts:
+    paths:
+      - ssl-redirect/ssl-redirect
+    expire_in: 30 mins
+
+deploy/ssl-image:
+  stage: deploy
+  image: docker
+  services:
+    - docker:dind
+  variables:
+    TAG: ssl
+  dependencies:
+    - build/ssl-app
+  script:
+    - cd ssl-redirect
+    - docker build -t $IMAGE:$TAG .
+    - docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+    - docker push $IMAGE:$TAG
+  only:
+    - master
+
+build/www-app:
+  stage: build
+  image: golang
+  variables:
+    GOOS: "linux"
+    GOARCH: "amd64"
+    CGO_ENABLED: "0"
+  script:
+    - cd www-redirect
+    - go build -a -installsuffix cgo -o www-redirect .
+  artifacts:
+    paths:
+      - www-redirect/www-redirect
+    expire_in: 30 mins
+
+deploy/www-image:
+  stage: deploy
+  image: docker
+  services:
+    - docker:dind
+  variables:
+    TAG: "www" 
+  dependencies:
+    - build/www-app
+  script:
+    - cd www-redirect
+    - docker build -t $IMAGE:$TAG .
+    - docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+    - docker push $IMAGE:$TAG
+  only:
+    - master
+
+build/non-www-app:
+  stage: build
+  image: golang
+  variables:
+    GOOS: "linux"
+    GOARCH: "amd64"
+    CGO_ENABLED: "0"
+  script:
+    - cd non-www-redirect
+    - go build -a -installsuffix cgo -o non-www-redirect .
+  artifacts:
+    paths:
+      - non-www-redirect/non-www-redirect
+    expire_in: 30 mins
+
+deploy/non-www-image:
+  stage: deploy
+  image: docker
+  services:
+    - docker:dind
+  variables:
+    TAG: "non-www"
+  dependencies:
+    - build/non-www-app
+  script:
+    - cd non-www-redirect
+    - docker build -t $IMAGE:$TAG .
+    - docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+    - docker push $IMAGE:$TAG
+  only:
+    - master
+
