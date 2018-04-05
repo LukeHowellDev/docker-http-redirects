@@ -2,102 +2,65 @@ stages:
   - build
   - deploy
 
+image: docker
+
+services:
+  - docker:dind
+
 variables:
   IMAGE: lukehowelldev/redirect
 
-build/ssl-app:
+.build: &build
   stage: build
-  image: golang
-  variables:
-    GOOS: "linux"
-    GOARCH: "amd64"
-    CGO_ENABLED: "0"
   script:
-    - cd ssl-redirect
-    - go build -a -installsuffix cgo -o ssl-redirect .
-  artifacts:
-    paths:
-      - ssl-redirect/ssl-redirect
-    expire_in: 30 mins
+    - cd "redirect-${TAG}"
+    - docker build -t "${CI_REGISTRY_IMAGE}/${TAG}:${CI_COMMIT_SHA}" -f ../_shared/Dockerfile .
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
+    - docker push "${CI_REGISTRY_IMAGE}/${TAG}:${CI_COMMIT_SHA}"
 
-deploy/ssl-image:
+.deploy: &deploy
   stage: deploy
-  image: docker
-  services:
-    - docker:dind
-  variables:
-    TAG: ssl
-  dependencies:
-    - build/ssl-app
   script:
-    - cd ssl-redirect
-    - docker build -t $IMAGE:$TAG .
-    - docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-    - docker push $IMAGE:$TAG
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
+    - docker pull "${CI_REGISTRY_IMAGE}/${TAG}:${CI_COMMIT_SHA}"
+    - docker tag "${CI_REGISTRY_IMAGE}/${TAG}:${CI_COMMIT_SHA}" "${IMAGE}:${TAG}"
+    - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+    - docker push "${IMAGE}:${TAG}"
   only:
     - master
 
-build/www-app:
-  stage: build
-  image: golang
+.ssl: &ssl
   variables:
-    GOOS: "linux"
-    GOARCH: "amd64"
-    CGO_ENABLED: "0"
-  script:
-    - cd www-redirect
-    - go build -a -installsuffix cgo -o www-redirect .
-  artifacts:
-    paths:
-      - www-redirect/www-redirect
-    expire_in: 30 mins
+    TAG: "ssl"
 
-deploy/www-image:
-  stage: deploy
-  image: docker
-  services:
-    - docker:dind
+.www: &www
   variables:
-    TAG: "www" 
-  dependencies:
-    - build/www-app
-  script:
-    - cd www-redirect
-    - docker build -t $IMAGE:$TAG .
-    - docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-    - docker push $IMAGE:$TAG
-  only:
-    - master
+    TAG: "www"
 
-build/non-www-app:
-  stage: build
-  image: golang
-  variables:
-    GOOS: "linux"
-    GOARCH: "amd64"
-    CGO_ENABLED: "0"
-  script:
-    - cd non-www-redirect
-    - go build -a -installsuffix cgo -o non-www-redirect .
-  artifacts:
-    paths:
-      - non-www-redirect/non-www-redirect
-    expire_in: 30 mins
-
-deploy/non-www-image:
-  stage: deploy
-  image: docker
-  services:
-    - docker:dind
+.non-www: &non-www
   variables:
     TAG: "non-www"
-  dependencies:
-    - build/non-www-app
-  script:
-    - cd non-www-redirect
-    - docker build -t $IMAGE:$TAG .
-    - docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-    - docker push $IMAGE:$TAG
-  only:
-    - master
 
+build/ssl:
+  <<: *build
+  <<: *ssl
+
+deploy/ssl:
+  <<: *deploy
+  <<: *ssl
+
+build/www:
+  <<: *build
+  <<: *www
+
+deploy/www:
+  <<: *deploy
+  <<: *www
+
+build/non-www:
+  <<: *build
+  <<: *non-www
+
+deploy/non-www:
+  <<: *deploy
+  <<: *non-www
