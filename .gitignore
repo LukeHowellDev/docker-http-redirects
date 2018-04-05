@@ -1,3 +1,2 @@
-ssl-redirect/ssl-redirect
-www-redirect/www-redirect
-non-www-redirect/non-www-redirect
+redirect-*/*
+!redirect-*/main.go
