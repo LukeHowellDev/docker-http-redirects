@@ -1,2 +1,3 @@
 redirect-*/*
+!redirect-*/Dockerfile
 !redirect-*/main.go
